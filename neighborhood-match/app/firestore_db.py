@@ -465,10 +465,10 @@ def query_neighborhood_rankings(
 
     Weights are drawn from the customer's stored profile if available.
     """
-    profile = get_customer_profile(user_id) if user_id else {}
-    w_walk = walk_weight if walk_weight is not None else (profile.get("walkability_priority") if profile else 5)
-    w_safe = safety_weight if safety_weight is not None else (profile.get("crime_safety_priority") if profile else 8)
-    w_school = school_weight if school_weight is not None else (profile.get("school_priority") if profile else 8)
+    profile = (get_customer_profile(user_id) if user_id else None) or {}
+    w_walk = walk_weight if walk_weight is not None else profile.get("walkability_priority", 5)
+    w_safe = safety_weight if safety_weight is not None else profile.get("crime_safety_priority", 8)
+    w_school = school_weight if school_weight is not None else profile.get("school_priority", 8)
     w_remote = remote_weight if remote_weight is not None else (9 if profile.get("remote_work", True) else 5)
     w_car = car_weight if car_weight is not None else (8 if profile.get("has_car", True) else 3)
 

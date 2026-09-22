@@ -48,4 +48,11 @@ def test_firestore_profile_and_ranking():
     top = rankings[0]
     assert "match_score" in top
     assert top["neighborhood"] in ["Round Rock", "Cedar Park"]
-    assert top["match_score"] >= rankings[-1]["match_score"]
+
+
+def test_ranking_for_brand_new_user():
+    # An entirely unknown user_id that has no profile in Firestore
+    rankings = rank_neighborhoods_by_preference(city="Austin", user_id="brand_new_user_99999")
+    assert len(rankings) > 0
+    assert "match_score" in rankings[0]
+    assert rankings[0]["match_score"] >= rankings[-1]["match_score"]
