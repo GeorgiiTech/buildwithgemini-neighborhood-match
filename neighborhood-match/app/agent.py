@@ -582,10 +582,10 @@ INSTRUCTION = schema_manager.generate_system_prompt(
         '{"Image": {"url": {"literalString": "https://..."}}}. Never point an '
         "Image at a bare filename, an artifact name, or a non-http(s) path. If you do "
         "not have a public URL, add a short Text line noting the image instead. "
-        "No markdown in text; use the usageHint property ('h1', 'h2', 'body') for "
-        "headings and emphasis. "
-        "Output ONLY the raw A2UI JSON array — no prose, and never wrap it in "
-        "<a2a_datapart_json> tags or 'kind'/'data'/'metadata' objects."
+        "No markdown inside A2UI text components; use the usageHint property ('h1', 'h2', 'body') for "
+        "headings and emphasis inside the card. "
+        "Always provide a helpful, comprehensive response in markdown (with greetings, neighborhood breakdown, pros/cons, and next steps) followed by the A2UI JSON array to render the card. "
+        "Never wrap the JSON in <a2a_datapart_json> tags or 'kind'/'data'/'metadata' objects."
     ),
     include_schema=True,
     include_examples=True,

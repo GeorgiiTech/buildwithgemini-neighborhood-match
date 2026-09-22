@@ -333,6 +333,7 @@ function bubble(who) {
  */
 function formatMarkdown(md) {
   if (!md) return "";
+  md = md.replace(/<\/?(?:a2a_datapart_json|a2ui-json)>/gi, "").trim();
   if (window.marked && typeof window.marked.parse === "function") {
     const rawHtml = window.marked.parse(md);
     return window.DOMPurify ? window.DOMPurify.sanitize(rawHtml) : rawHtml;
@@ -423,15 +424,33 @@ function formatMarkdown(md) {
 function boundStr(v) {
   if (v == null) return "";
   if (typeof v === "string") return v;
-  if (typeof v === "object" && typeof v.literalString === "string") return v.literalString;
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  if (typeof v === "object") {
+    if (typeof v.literalString === "string") return v.literalString;
+    if (typeof v.value === "string") return String(v.value);
+    if (typeof v.text === "string") return v.text;
+    if (typeof v.label === "string") return v.label;
+  }
   return "";
 }
 
 function childIds(container) {
-  if (!container || !container.children) return [];
+  if (!container) return [];
+  // 1. Single child property (e.g., Card: { child: "content_column" })
+  if (typeof container.child === "string") return [container.child];
+  if (container.child && typeof container.child.id === "string") return [container.child.id];
+  if (typeof container.content === "string") return [container.content];
+  if (container.content && typeof container.content.id === "string") return [container.content.id];
+
+  // 2. Children property
   const c = container.children;
-  if (Array.isArray(c)) return c;
-  if (Array.isArray(c.explicitList)) return c.explicitList;
+  if (!c) return [];
+  if (Array.isArray(c)) {
+    return c.map(item => (typeof item === "string" ? item : (item && item.id ? item.id : null))).filter(Boolean);
+  }
+  if (c.explicitList && Array.isArray(c.explicitList)) {
+    return c.explicitList.map(item => (typeof item === "string" ? item : (item && item.id ? item.id : null))).filter(Boolean);
+  }
   return [];
 }
 
@@ -470,35 +489,39 @@ function buildNode(id, comps, visited) {
   switch (kind) {
     case "Card": {
       const card = el("div", "a2card");
-      for (const cid of childIds(props)) {
+      const cids = childIds(props);
+      for (const cid of cids) {
         const child = buildNode(cid, comps, visited);
         if (child) card.appendChild(child);
       }
-      return card;
+      return card.childNodes.length > 0 ? card : null;
     }
     case "Column": {
       const col = el("div", "a2col");
-      for (const cid of childIds(props)) {
+      const cids = childIds(props);
+      for (const cid of cids) {
         const child = buildNode(cid, comps, visited);
         if (child) col.appendChild(child);
       }
-      return col;
+      return col.childNodes.length > 0 ? col : null;
     }
     case "Row": {
       const row = el("div", "a2row" + (props.distribution === "spaceBetween" ? " between" : ""));
-      for (const cid of childIds(props)) {
+      const cids = childIds(props);
+      for (const cid of cids) {
         const child = buildNode(cid, comps, visited);
         if (child) row.appendChild(child);
       }
-      return row;
+      return row.childNodes.length > 0 ? row : null;
     }
     case "List": {
       const col = el("div", "a2col");
-      for (const cid of childIds(props)) {
+      const cids = childIds(props);
+      for (const cid of cids) {
         const child = buildNode(cid, comps, visited);
         if (child) col.appendChild(child);
       }
-      return col;
+      return col.childNodes.length > 0 ? col : null;
     }
     case "Text": {
       const variant = props.variant || props.usageHint || "body";
@@ -509,7 +532,9 @@ function buildNode(id, comps, visited) {
         h4: "a2text a2-h4",
         caption: "a2text a2-caption"
       }[variant] || "a2text";
-      return el("p", cls, boundStr(props.text));
+      const str = boundStr(props.text);
+      if (!str) return null;
+      return el("p", cls, str);
     }
     case "Divider":
       return el("hr", "a2divider");
@@ -537,14 +562,19 @@ function renderSurface(messages, container) {
   for (const m of messages) {
     if (m.beginRendering && typeof m.beginRendering.root === "string") roots.push(m.beginRendering.root);
     const su = m.surfaceUpdate;
-    if (su && Array.isArray(su.components)) for (const c of su.components) if (c && c.id && c.component) comps[c.id] = c.component;
+    if (su && Array.isArray(su.components)) {
+      for (const c of su.components) {
+        if (c && c.id && c.component) comps[c.id] = c.component;
+      }
+    }
   }
   let rootIds = roots.filter(r => comps[r]);
   if (rootIds.length === 0) {
     const referenced = new Set();
     for (const id in comps) {
       const spec = comps[id];
-      childIds(spec[Object.keys(spec)[0]] || {}).forEach(c => referenced.add(c));
+      const kind = Object.keys(spec)[0];
+      childIds(spec[kind] || {}).forEach(c => referenced.add(c));
     }
     rootIds = Object.keys(comps).filter(id => !referenced.has(id));
   }
@@ -565,11 +595,18 @@ function flattenText(messages) {
     const su = m.surfaceUpdate;
     if (su && Array.isArray(su.components)) {
       for (const c of su.components) {
-        if (c && c.component && c.component.Text) out.push(boundStr(c.component.Text.text));
+        if (c && c.component) {
+          const kind = Object.keys(c.component)[0];
+          const props = c.component[kind] || {};
+          if (kind === "Text") {
+            const t = boundStr(props.text);
+            if (t) out.push(t);
+          }
+        }
       }
     }
   }
-  return out.join("\n").trim();
+  return out.join("\n\n").trim();
 }
 
 function renderReply(b, parts) {
@@ -586,7 +623,8 @@ function renderReply(b, parts) {
 
   if (a2ui.length) {
     const a2uiContainer = el("div", "a2ui-surface");
-    if (!renderSurface(a2ui, a2uiContainer)) {
+    const drew = renderSurface(a2ui, a2uiContainer);
+    if (!drew || a2uiContainer.childNodes.length === 0) {
       const flat = flattenText(a2ui);
       if (flat) {
         const fallbackEl = el("div", "markdown-body");
@@ -594,7 +632,9 @@ function renderReply(b, parts) {
         a2uiContainer.appendChild(fallbackEl);
       }
     }
-    b.appendChild(a2uiContainer);
+    if (a2uiContainer.childNodes.length > 0) {
+      b.appendChild(a2uiContainer);
+    }
   }
 
   if (!b.childNodes.length) b.textContent = "(no response)";

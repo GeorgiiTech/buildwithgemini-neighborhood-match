@@ -34,7 +34,7 @@ Relocating to a new city or neighborhood is one of the most stressful life decis
 - **🏠 Housing Catalog & Inventory Search**: Searches curated real estate listings filtered by bedroom count, target budget, and neighborhood match scores.
 - **💰 Affordability Breakdown**: Calculates complete monthly living costs, including rent/mortgage payments, HOA fees, property taxes, estimated utilities, and renter's/homeowner's insurance.
 - **📊 Relocation Market Trends & Analytics**: Stores mover origins, target destinations, and reasons for leaving in Firestore, generating aggregate relocation intelligence for future movers.
-- **🪟 Native Agent-First UI (A2UI)**: Renders structured UI cards and comparison surfaces directly in the chat stream instead of walls of unstructured text.
+- **🪟 Native Agent-First UI (A2UI) + Markdown**: Dual-mode rendering delivering conversational prose, pros/cons, and next steps in markdown alongside responsive interactive A2UI cards.
 - **🎨 Neighborhood Vibe Concepts**: Generates concept imagery for streetscapes and neighborhood atmosphere using Google Cloud media generation.
 
 ---
@@ -68,7 +68,7 @@ build-with-gemini/
 │   ├── app/
 │   │   ├── agent.py               # Core ADK agent, tools, callbacks, and A2UI schema
 │   │   ├── firestore_db.py        # Cloud Firestore client, schema seeding, and queries
-│   │   └── a2ui_utils.py          # A2UI response formatting callback
+│   │   └── a2ui_utils.py          # A2UI response formatting callback & prose extraction
 │   ├── frontend/
 │   │   ├── main.py                # FastAPI A2A client proxy
 │   │   ├── static/
@@ -78,7 +78,7 @@ build-with-gemini/
 │   ├── agents-cli-manifest.yaml   # Agent Platform deployment manifest
 │   ├── deployment_metadata.json   # Deployed Reasoning Engine resource metadata
 │   ├── pyproject.toml             # Python dependencies (managed via uv)
-│   └── tests/                     # Unit and integration test suite
+│   └── tests/                     # Unit and integration test suite (11 passing tests)
 ```
 
 ---

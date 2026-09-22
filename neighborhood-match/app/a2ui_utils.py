@@ -217,6 +217,59 @@ def _surface_is_renderable(messages: list[dict]) -> bool:
     return True
 
 
+def _extract_prose_and_messages(text: str) -> tuple[str, list[dict]]:
+    """Extract surrounding conversational prose and A2UI messages from model output."""
+    raw = text.strip()
+    decoder = json.JSONDecoder()
+    n = len(raw)
+    idx = 0
+    first_json_idx = -1
+    last_json_end = -1
+    messages: list[dict] = []
+
+    while idx < n:
+        while idx < n and raw[idx] not in "{[":
+            idx += 1
+        if idx >= n:
+            break
+        try:
+            val, end = decoder.raw_decode(raw, idx)
+            items = val if isinstance(val, list) else [val]
+            has_a2ui = False
+            for item in items:
+                if isinstance(item, dict) and (
+                    any(k in item for k in _A2UI_KEYS)
+                    or (isinstance(item.get("data"), dict) and any(k in item["data"] for k in _A2UI_KEYS))
+                ):
+                    has_a2ui = True
+                    break
+            if has_a2ui:
+                if first_json_idx == -1:
+                    first_json_idx = idx
+                last_json_end = end
+                for item in items:
+                    if isinstance(item, dict):
+                        inner = item.get("data")
+                        if isinstance(inner, dict) and any(k in inner for k in _A2UI_KEYS):
+                            messages.append(inner)
+                        elif any(k in item for k in _A2UI_KEYS):
+                            messages.append(item)
+            idx = end
+        except json.JSONDecodeError:
+            idx += 1
+
+    if first_json_idx != -1 and messages:
+        prose_prefix = raw[:first_json_idx].strip()
+        prose_suffix = raw[last_json_end:].strip()
+        prose = "\n\n".join(p for p in (prose_prefix, prose_suffix) if p).strip()
+        prose = _TAG_RE.sub("", prose).strip()
+        prose = re.sub(r"```(json)?\s*", "", prose).strip()
+        prose = re.sub(r"\s*```", "", prose).strip()
+        return prose, messages
+
+    return "", _extract_a2ui_messages(raw)
+
+
 def a2ui_callback(
     callback_context: CallbackContext,
     llm_response: LlmResponse,
@@ -233,7 +286,7 @@ def a2ui_callback(
         if not any(k in text for k in _A2UI_KEYS):
             continue
 
-        messages = _extract_a2ui_messages(text)
+        prose, messages = _extract_prose_and_messages(text)
         if not messages:
             continue
 
@@ -246,11 +299,16 @@ def a2ui_callback(
             # root/child reference. Return clean text instead of a blank card.
             return LlmResponse(
                 content=types.Content(
-                    role="model", parts=[types.Part(text=_FALLBACK_TEXT)]
+                    role="model",
+                    parts=[types.Part(text=prose or _FALLBACK_TEXT)],
                 )
             )
 
-        new_parts = [_wrap_a2ui_part(m) for m in messages]
+        new_parts = []
+        if prose:
+            new_parts.append(types.Part(text=prose))
+        new_parts.extend([_wrap_a2ui_part(m) for m in messages])
+
         return LlmResponse(
             content=types.Content(role="model", parts=new_parts),
             custom_metadata={"a2a:response": "true"},
