@@ -12,9 +12,11 @@
 
 ## 🎬 Demo
 
-![Neighborhood Match Demo](assets/demo.gif)
+[![Neighborhood Match Demo](assets/demo.gif)](assets/demo.mp4)
 
 *Live walkthrough showing customer intake interview, preference analysis, and native A2UI recommendation cards with safety scores, school ratings, and budget breakdown.*
+
+> 🎥 **Video:** Watch or download the recording: [`assets/demo.mp4`](assets/demo.mp4)
 
 ---
 
